@@ -175,17 +175,34 @@ export function useStorage() {
   );
 
   const deleteItem = useCallback(async (fullPath: string) => {
+    setLoading(true);
     const itemRef = ref(storage, fullPath);
     await deleteObject(itemRef);
   }, []);
 
   const deleteFolder = useCallback(async (fullPath: string) => {
+    setLoading(true);
     await deleteFolderRecursive(fullPath);
   }, []);
 
   const moveItem = useCallback(
     async (item: StorageItem, targetFolderPath: string) => {
+      setLoading(true);
       const destPath = `${targetFolderPath ? targetFolderPath + "/" : ""}${item.name}`;
+      if (item.type === "file") {
+        await moveFileInternal(item.fullPath, destPath);
+      } else {
+        await moveFolderRecursive(item.fullPath, destPath);
+      }
+    },
+    []
+  );
+
+  const renameItem = useCallback(
+    async (item: StorageItem, newName: string) => {
+      setLoading(true);
+      const parentPath = item.fullPath.split("/").slice(0, -1).join("/");
+      const destPath = parentPath ? `${parentPath}/${newName}` : newName;
       if (item.type === "file") {
         await moveFileInternal(item.fullPath, destPath);
       } else {
@@ -207,6 +224,7 @@ export function useStorage() {
     deleteItem,
     deleteFolder,
     moveItem,
+    renameItem,
     clearUploads,
   };
 }

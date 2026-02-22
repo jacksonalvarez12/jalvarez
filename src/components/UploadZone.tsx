@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import type { UploadTask } from "../hooks/useStorage";
 
 interface Props {
@@ -10,6 +10,46 @@ interface Props {
 export default function UploadZone({ uploads, onUpload, onClear }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [fadingIndices, setFadingIndices] = useState<Set<number>>(new Set());
+  const [hiddenIndices, setHiddenIndices] = useState<Set<number>>(new Set());
+  const scheduledRef = useRef<Set<number>>(new Set());
+
+  // Resets all local fade state and calls the parent clear
+  const handleClear = useCallback(() => {
+    setFadingIndices(new Set());
+    setHiddenIndices(new Set());
+    scheduledRef.current.clear();
+    onClear();
+  }, [onClear]);
+
+  // Schedule fade-out for each successfully completed upload
+  useEffect(() => {
+    uploads.forEach((u, i) => {
+      if (u.done && !u.error && !scheduledRef.current.has(i)) {
+        scheduledRef.current.add(i);
+
+        const fadeTimer = setTimeout(() => {
+          setFadingIndices((prev) => new Set(prev).add(i));
+
+          setTimeout(() => {
+            setHiddenIndices((prev) => {
+              const next = new Set(prev).add(i);
+              const allDoneHidden = uploads
+                .map((u2, j) => ({ u2, j }))
+                .filter(({ u2 }) => u2.done && !u2.error)
+                .every(({ j }) => next.has(j));
+              if (allDoneHidden) {
+                setTimeout(handleClear, 0);
+              }
+              return next;
+            });
+          }, 500);
+        }, 2000);
+
+        return () => clearTimeout(fadeTimer);
+      }
+    });
+  }, [uploads, handleClear]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -24,8 +64,12 @@ export default function UploadZone({ uploads, onUpload, onClear }: Props) {
     e.target.value = "";
   };
 
-  const activeUploads = uploads.filter((u) => !u.done);
-  const doneUploads = uploads.filter((u) => u.done);
+  const visibleUploads = uploads
+    .map((u, i) => ({ u, i }))
+    .filter(({ i }) => !hiddenIndices.has(i));
+
+  const hasActiveUploads = visibleUploads.some(({ u }) => !u.done);
+  const hasErrors = visibleUploads.some(({ u }) => u.done && u.error);
 
   return (
     <div className="flex flex-col gap-3">
@@ -54,10 +98,14 @@ export default function UploadZone({ uploads, onUpload, onClear }: Props) {
         />
       </div>
 
-      {uploads.length > 0 && (
+      {visibleUploads.length > 0 && (
         <div className="flex flex-col gap-2">
-          {uploads.map((u, i) => (
-            <div key={i} className="flex items-center gap-3 text-sm">
+          {visibleUploads.map(({ u, i }) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 text-sm transition-opacity duration-500"
+              style={{ opacity: fadingIndices.has(i) ? 0 : 1 }}
+            >
               <span className="text-gray-300 truncate flex-1">{u.name}</span>
               {u.error ? (
                 <span className="text-red-400 text-xs">{u.error}</span>
@@ -73,9 +121,10 @@ export default function UploadZone({ uploads, onUpload, onClear }: Props) {
               )}
             </div>
           ))}
-          {activeUploads.length === 0 && doneUploads.length > 0 && (
+          {/* Only show Clear for errored uploads that won't auto-dismiss */}
+          {!hasActiveUploads && hasErrors && (
             <button
-              onClick={onClear}
+              onClick={handleClear}
               className="text-xs text-gray-500 hover:text-gray-300 text-left mt-1 cursor-pointer"
             >
               Clear

@@ -25,6 +25,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
     deleteItem,
     deleteFolder,
     moveItem,
+    renameItem,
     clearUploads,
   } = useStorage();
 
@@ -42,6 +43,11 @@ export default function FileExplorer({ user, onSignOut }: Props) {
 
   const handleMove = async (item: StorageItem, targetFolderPath: string) => {
     await moveItem(item, targetFolderPath);
+    refresh();
+  };
+
+  const handleRename = async (item: StorageItem, newName: string) => {
+    await renameItem(item, newName);
     refresh();
   };
 
@@ -83,7 +89,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <BreadcrumbNav path={currentPath} onNavigate={setCurrentPath} onMove={handleMove} />
@@ -155,6 +161,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
             onNavigate={setCurrentPath}
             onDelete={handleDelete}
             onMove={handleMove}
+            onRename={handleRename}
           />
         </div>
       </div>
