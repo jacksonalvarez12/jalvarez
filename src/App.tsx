@@ -1,3 +1,4 @@
+import { Routes, Route } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import LoginPage from "./components/LoginPage";
 import FileExplorer from "./components/FileExplorer";
@@ -17,5 +18,9 @@ export default function App() {
     return <LoginPage onSignIn={signIn} />;
   }
 
-  return <FileExplorer user={user} onSignOut={signOut} />;
+  return (
+    <Routes>
+      <Route path="/*" element={<FileExplorer user={user} onSignOut={signOut} />} />
+    </Routes>
+  );
 }

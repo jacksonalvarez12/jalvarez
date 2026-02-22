@@ -1,20 +1,45 @@
 import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import type { User } from "firebase/auth";
 import { useStorage } from "../hooks/useStorage";
 import type { StorageItem } from "../hooks/useStorage";
 import BreadcrumbNav from "./BreadcrumbNav";
 import FileList from "./FileList";
 import UploadZone from "./UploadZone";
+import ConflictModal from "./ConflictModal";
 
 interface Props {
   user: User;
   onSignOut: () => void;
 }
 
+type PendingConflict =
+  | { type: "upload"; files: File[]; targetPath: string; conflicts: string[] }
+  | { type: "move"; item: StorageItem; targetFolderPath: string; conflicts: string[] }
+  | { type: "rename"; item: StorageItem; newName: string; conflicts: string[] };
+
+function makeUniqueName(name: string, existingNames: Set<string>): string {
+  const dotIdx = name.lastIndexOf(".");
+  const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+  const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+  let counter = 1;
+  let candidate = `${base} (${counter})${ext}`;
+  while (existingNames.has(candidate)) {
+    counter++;
+    candidate = `${base} (${counter})${ext}`;
+  }
+  return candidate;
+}
+
 export default function FileExplorer({ user, onSignOut }: Props) {
-  const [currentPath, setCurrentPath] = useState("");
+  const { "*": splat } = useParams();
+  const currentPath = splat ?? "";
+  const navigate = useNavigate();
+
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [pendingConflict, setPendingConflict] = useState<PendingConflict | null>(null);
+
   const {
     items,
     loading,
@@ -26,6 +51,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
     deleteFolder,
     moveItem,
     renameItem,
+    getExistingNames,
     clearUploads,
   } = useStorage();
 
@@ -37,18 +63,40 @@ export default function FileExplorer({ user, onSignOut }: Props) {
     refresh();
   }, [refresh]);
 
-  const handleUpload = (files: File[]) => {
-    uploadFiles(files, currentPath, refresh);
+  const handleNavigate = (path: string) => {
+    setShowNewFolder(false);
+    setNewFolderName("");
+    navigate(path ? `/${path}` : "/");
+  };
+
+  const handleUpload = async (files: File[]) => {
+    const existing = await getExistingNames(currentPath);
+    const conflicts = files.map((f) => f.name).filter((n) => existing.has(n));
+    if (conflicts.length > 0) {
+      setPendingConflict({ type: "upload", files, targetPath: currentPath, conflicts });
+    } else {
+      uploadFiles(files, currentPath, refresh);
+    }
   };
 
   const handleMove = async (item: StorageItem, targetFolderPath: string) => {
-    await moveItem(item, targetFolderPath);
-    refresh();
+    const existing = await getExistingNames(targetFolderPath);
+    if (existing.has(item.name)) {
+      setPendingConflict({ type: "move", item, targetFolderPath, conflicts: [item.name] });
+    } else {
+      await moveItem(item, targetFolderPath);
+      navigate(targetFolderPath ? `/${targetFolderPath}` : "/");
+    }
   };
 
   const handleRename = async (item: StorageItem, newName: string) => {
-    await renameItem(item, newName);
-    refresh();
+    const conflict = items.find((i) => i.name === newName && i.fullPath !== item.fullPath);
+    if (conflict) {
+      setPendingConflict({ type: "rename", item, newName, conflicts: [newName] });
+    } else {
+      await renameItem(item, newName);
+      refresh();
+    }
   };
 
   const handleDelete = async (fullPath: string) => {
@@ -70,8 +118,59 @@ export default function FileExplorer({ user, onSignOut }: Props) {
     refresh();
   };
 
+  const resolveConflict = async (resolution: "replace" | "keepBoth") => {
+    if (!pendingConflict) return;
+    const op = pendingConflict;
+    setPendingConflict(null);
+
+    if (op.type === "upload") {
+      let nameMap: Record<string, string> | undefined;
+      if (resolution === "keepBoth") {
+        const existing = await getExistingNames(op.targetPath);
+        const takenNames = new Set(existing);
+        nameMap = {};
+        for (const file of op.files) {
+          if (op.conflicts.includes(file.name)) {
+            const uniqueName = makeUniqueName(file.name, takenNames);
+            nameMap[file.name] = uniqueName;
+            takenNames.add(uniqueName);
+          }
+        }
+      }
+      uploadFiles(op.files, op.targetPath, refresh, nameMap);
+    } else if (op.type === "move") {
+      if (resolution === "keepBoth") {
+        const existing = await getExistingNames(op.targetFolderPath);
+        const destName = makeUniqueName(op.item.name, existing);
+        await moveItem(op.item, op.targetFolderPath, destName);
+      } else {
+        await moveItem(op.item, op.targetFolderPath);
+      }
+      navigate(op.targetFolderPath ? `/${op.targetFolderPath}` : "/");
+    } else {
+      // rename
+      if (resolution === "keepBoth") {
+        const existingNames = new Set(items.map((i) => i.name));
+        const uniqueName = makeUniqueName(op.newName, existingNames);
+        await renameItem(op.item, uniqueName);
+      } else {
+        await renameItem(op.item, op.newName);
+      }
+      refresh();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      {pendingConflict && (
+        <ConflictModal
+          conflicts={pendingConflict.conflicts}
+          onReplace={() => resolveConflict("replace")}
+          onKeepBoth={() => resolveConflict("keepBoth")}
+          onCancel={() => setPendingConflict(null)}
+        />
+      )}
+
       {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -92,7 +191,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
       <div className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <BreadcrumbNav path={currentPath} onNavigate={setCurrentPath} onMove={handleMove} />
+          <BreadcrumbNav path={currentPath} onNavigate={handleNavigate} />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowNewFolder(!showNewFolder)}
@@ -158,7 +257,8 @@ export default function FileExplorer({ user, onSignOut }: Props) {
           <FileList
             items={items}
             loading={loading}
-            onNavigate={setCurrentPath}
+            parentPath={currentPath === "" ? null : currentPath.split("/").slice(0, -1).join("/")}
+            onNavigate={handleNavigate}
             onDelete={handleDelete}
             onMove={handleMove}
             onRename={handleRename}

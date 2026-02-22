@@ -93,17 +93,25 @@ export default function FileItem({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
+  // For files, split name into base + extension so the extension stays locked
+  const extDotIndex = item.type === "file" ? item.name.lastIndexOf(".") : -1;
+  const fileExt = extDotIndex > 0 ? item.name.slice(extDotIndex) : "";
+  const fileBaseName = extDotIndex > 0 ? item.name.slice(0, extDotIndex) : item.name;
+
   const startRename = (e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmDelete(false);
-    setRenameValue(item.name);
+    setRenameValue(item.type === "file" ? fileBaseName : item.name);
     setIsRenaming(true);
   };
 
   const handleRenameSubmit = () => {
     const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== item.name) {
-      onRename(item, trimmed);
+    if (trimmed) {
+      const newName = item.type === "file" ? trimmed + fileExt : trimmed;
+      if (newName !== item.name) {
+        onRename(item, newName);
+      }
     }
     setIsRenaming(false);
   };
@@ -184,18 +192,25 @@ export default function FileItem({
 
   // Inline rename input shown in the name cell
   const RenameInput = (
-    <input
-      autoFocus
-      value={renameValue}
-      onChange={(e) => setRenameValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") handleRenameSubmit();
-        if (e.key === "Escape") handleRenameCancel();
-      }}
-      onClick={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
-      className="bg-gray-800 border border-blue-500 rounded px-2 py-0.5 text-sm text-white focus:outline-none w-full min-w-0"
-    />
+    <div className="flex items-center gap-0.5 w-full min-w-0">
+      <input
+        autoFocus
+        value={renameValue}
+        onChange={(e) => setRenameValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleRenameSubmit();
+          if (e.key === "Escape") handleRenameCancel();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        className="bg-gray-800 border border-blue-500 rounded-l px-2 py-0.5 text-sm text-white focus:outline-none flex-1 min-w-0"
+      />
+      {fileExt && (
+        <span className="bg-gray-700 border border-blue-500 border-l-0 rounded-r px-2 py-0.5 text-sm text-gray-400 shrink-0 select-none">
+          {fileExt}
+        </span>
+      )}
+    </div>
   );
 
   // Save/Cancel shown in actions areas while renaming

@@ -107,10 +107,19 @@ export function useStorage() {
     }
   }, []);
 
+  const getExistingNames = useCallback(async (folderPath: string): Promise<Set<string>> => {
+    const folderRef = ref(storage, folderPath || "/");
+    const result = await listAll(folderRef);
+    return new Set([
+      ...result.prefixes.map((p) => p.name),
+      ...result.items.filter((i) => i.name !== ".keep").map((i) => i.name),
+    ]);
+  }, []);
+
   const uploadFiles = useCallback(
-    (files: File[], currentPath: string, onDone: () => void) => {
+    (files: File[], currentPath: string, onDone: () => void, nameMap?: Record<string, string>) => {
       const newUploads: UploadTask[] = files.map((f) => ({
-        name: f.name,
+        name: nameMap?.[f.name] ?? f.name,
         progress: 0,
         done: false,
       }));
@@ -120,9 +129,10 @@ export function useStorage() {
 
       files.forEach((file, i) => {
         const globalIndex = uploads.length + i;
+        const uploadName = nameMap?.[file.name] ?? file.name;
         const storageRef = ref(
           storage,
-          `${currentPath ? currentPath + "/" : ""}${file.name}`,
+          `${currentPath ? currentPath + "/" : ""}${uploadName}`,
         );
         const task = uploadBytesResumable(storageRef, file);
 
@@ -186,9 +196,10 @@ export function useStorage() {
   }, []);
 
   const moveItem = useCallback(
-    async (item: StorageItem, targetFolderPath: string) => {
+    async (item: StorageItem, targetFolderPath: string, destName?: string) => {
       setLoading(true);
-      const destPath = `${targetFolderPath ? targetFolderPath + "/" : ""}${item.name}`;
+      const name = destName ?? item.name;
+      const destPath = `${targetFolderPath ? targetFolderPath + "/" : ""}${name}`;
       if (item.type === "file") {
         await moveFileInternal(item.fullPath, destPath);
       } else {
@@ -225,6 +236,7 @@ export function useStorage() {
     deleteFolder,
     moveItem,
     renameItem,
+    getExistingNames,
     clearUploads,
   };
 }

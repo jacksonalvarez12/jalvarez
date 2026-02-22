@@ -5,6 +5,7 @@ import FileItem from "./FileItem";
 interface Props {
   items: StorageItem[];
   loading: boolean;
+  parentPath: string | null;
   onNavigate: (path: string) => void;
   onDelete: (fullPath: string) => void;
   onMove: (item: StorageItem, targetFolderPath: string) => void;
@@ -14,6 +15,7 @@ interface Props {
 export default function FileList({
   items,
   loading,
+  parentPath,
   onNavigate,
   onDelete,
   onMove,
@@ -25,6 +27,7 @@ export default function FileList({
     y: number;
   } | null>(null);
   const [touchDragOverPath, setTouchDragOverPath] = useState<string | null>(null);
+  const [isDragOverParent, setIsDragOverParent] = useState(false);
 
   const handleTouchDragStart = (item: StorageItem, x: number, y: number) => {
     setTouchDrag({ item, x, y });
@@ -67,8 +70,8 @@ export default function FileList({
     };
   }, [touchDrag, touchDragOverPath, onMove]);
 
-  // Initial load with no items yet
-  if (loading && items.length === 0) {
+  // Show spinner only when at root with no items yet (subfolders always show "..")
+  if (loading && items.length === 0 && parentPath === null) {
     return (
       <div className="flex items-center justify-center gap-2.5 py-20 text-gray-500 text-sm">
         <span className="inline-block w-4 h-4 border-2 border-gray-600 border-t-gray-300 rounded-full animate-spin" />
@@ -77,7 +80,7 @@ export default function FileList({
     );
   }
 
-  if (!loading && items.length === 0) {
+  if (!loading && items.length === 0 && parentPath === null) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-600 gap-2">
         <span className="text-4xl">📭</span>
@@ -123,6 +126,36 @@ export default function FileList({
           </tr>
         </thead>
         <tbody>
+          {parentPath !== null && (
+            <tr
+              data-folder-path={parentPath}
+              onClick={() => onNavigate(parentPath)}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setIsDragOverParent(true); }}
+              onDragLeave={() => setIsDragOverParent(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOverParent(false);
+                try {
+                  const dragged: StorageItem = JSON.parse(e.dataTransfer.getData("application/json"));
+                  const currentParent = dragged.fullPath.split("/").slice(0, -1).join("/");
+                  if (currentParent !== parentPath) onMove(dragged, parentPath);
+                } catch { /* ignore */ }
+              }}
+              className={`border-b border-gray-800 transition-colors cursor-pointer ${
+                isDragOverParent ? "bg-blue-500/20 border-blue-500/50" : "hover:bg-gray-800/50"
+              }`}
+            >
+              <td className="py-2.5 px-4 w-full">
+                <div className="flex items-center gap-2.5 text-gray-500 hover:text-gray-300 transition-colors">
+                  <span className="shrink-0">📂</span>
+                  <span className="font-medium">..</span>
+                </div>
+              </td>
+              <td className="hidden sm:table-cell py-2.5 px-4 text-gray-600 text-sm">—</td>
+              <td className="hidden sm:table-cell py-2.5 px-4 text-gray-600 text-sm">—</td>
+              <td className="hidden md:table-cell py-2.5 px-4" />
+            </tr>
+          )}
           {items.map((item) => (
             <FileItem
               key={item.fullPath}
