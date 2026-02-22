@@ -1,20 +1,25 @@
-import type { StorageItem } from '../hooks/useStorage'
-import FileItem from './FileItem'
+import type { StorageItem } from "../hooks/useStorage";
+import FileItem from "./FileItem";
 
 interface Props {
-  items: StorageItem[]
-  loading: boolean
-  onNavigate: (path: string) => void
-  onDelete: (fullPath: string) => void
+  items: StorageItem[];
+  loading: boolean;
+  onNavigate: (path: string) => void;
+  onDelete: (fullPath: string) => void;
 }
 
-export default function FileList({ items, loading, onNavigate, onDelete }: Props) {
+export default function FileList({
+  items,
+  loading,
+  onNavigate,
+  onDelete,
+}: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500 text-sm">
         Loading...
       </div>
-    )
+    );
   }
 
   if (items.length === 0) {
@@ -23,7 +28,7 @@ export default function FileList({ items, loading, onNavigate, onDelete }: Props
         <span className="text-4xl">📭</span>
         <p className="text-sm">This folder is empty</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -31,9 +36,15 @@ export default function FileList({ items, loading, onNavigate, onDelete }: Props
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-gray-800">
-            <th className="py-2 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th className="py-2 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-            <th className="py-2 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Modified</th>
+            <th className="py-2 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Name
+            </th>
+            <th className="py-2 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Size
+            </th>
+            <th className="py-2 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Modified
+            </th>
             <th className="py-2 px-4"></th>
           </tr>
         </thead>
@@ -49,5 +60,5 @@ export default function FileList({ items, loading, onNavigate, onDelete }: Props
         </tbody>
       </table>
     </div>
-  )
+  );
 }

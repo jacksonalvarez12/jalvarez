@@ -1,48 +1,57 @@
-import { useRef, useState } from 'react'
-import type { UploadTask } from '../hooks/useStorage'
+import { useRef, useState } from "react";
+import type { UploadTask } from "../hooks/useStorage";
 
 interface Props {
-  uploads: UploadTask[]
-  onUpload: (files: File[]) => void
-  onClear: () => void
+  uploads: UploadTask[];
+  onUpload: (files: File[]) => void;
+  onClear: () => void;
 }
 
 export default function UploadZone({ uploads, onUpload, onClear }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragging(false)
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length) onUpload(files)
-  }
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) onUpload(files);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
-    if (files.length) onUpload(files)
-    e.target.value = ''
-  }
+    const files = Array.from(e.target.files ?? []);
+    if (files.length) onUpload(files);
+    e.target.value = "";
+  };
 
-  const activeUploads = uploads.filter((u) => !u.done)
-  const doneUploads = uploads.filter((u) => u.done)
+  const activeUploads = uploads.filter((u) => !u.done);
+  const doneUploads = uploads.filter((u) => u.done);
 
   return (
     <div className="flex flex-col gap-3">
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
           dragging
-            ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-            : 'border-gray-700 hover:border-gray-500 text-gray-500 hover:text-gray-400'
+            ? "border-blue-500 bg-blue-500/10 text-blue-400"
+            : "border-gray-700 hover:border-gray-500 text-gray-500 hover:text-gray-400"
         }`}
       >
         <div className="text-2xl mb-1">⬆️</div>
         <p className="text-sm">Drop files here or click to browse</p>
-        <input ref={inputRef} type="file" multiple className="hidden" onChange={handleChange} />
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleChange}
+        />
       </div>
 
       {uploads.length > 0 && (
@@ -75,5 +84,5 @@ export default function UploadZone({ uploads, onUpload, onClear }: Props) {
         </div>
       )}
     </div>
-  )
+  );
 }

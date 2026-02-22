@@ -1,39 +1,39 @@
-import { useState, useEffect } from 'react'
-import type { User } from 'firebase/auth'
+import { useState, useEffect } from "react";
+import type { User } from "firebase/auth";
 import {
   onAuthStateChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
-} from 'firebase/auth'
-import { auth } from '../lib/firebase'
+} from "firebase/auth";
+import { auth } from "../lib/firebase";
 
-const ALLOWED_UID = import.meta.env.VITE_ALLOWED_UID
+const ALLOWED_UID = import.meta.env.VITE_ALLOWED_UID;
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser && ALLOWED_UID && firebaseUser.uid !== ALLOWED_UID) {
-        // Wrong account — sign them out immediately
-        await firebaseSignOut(auth)
-        setUser(null)
+      if (firebaseUser && ALLOWED_UID && firebaseUser.uid === ALLOWED_UID) {
+        setUser(firebaseUser);
       } else {
-        setUser(firebaseUser)
+        // Wrong account — sign them out immediately
+        await firebaseSignOut(auth);
+        setUser(null);
       }
-      setLoading(false)
-    })
-    return unsubscribe
-  }, [])
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   const signIn = async () => {
-    const provider = new GoogleAuthProvider()
-    await signInWithPopup(auth, provider)
-  }
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  };
 
-  const signOut = () => firebaseSignOut(auth)
+  const signOut = () => firebaseSignOut(auth);
 
-  return { user, loading, signIn, signOut }
+  return { user, loading, signIn, signOut };
 }
