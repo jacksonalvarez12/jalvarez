@@ -7,6 +7,7 @@ interface Props {
   item: StorageItem;
   onNavigate: (path: string) => void;
   onDelete: (fullPath: string) => void;
+  onMove: (item: StorageItem, targetFolderPath: string) => void;
 }
 
 function formatBytes(bytes: number) {
@@ -54,18 +55,71 @@ async function forceDownload(fullPath: string, filename: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
-export default function FileItem({ item, onNavigate, onDelete }: Props) {
+export default function FileItem({ item, onNavigate, onDelete, onMove }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("application/json", JSON.stringify(item));
+    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = () => setIsDragging(false);
+
+  // Only folders handle drops
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => setIsDragOver(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (item.type !== "folder") return;
+    try {
+      const dragged: StorageItem = JSON.parse(
+        e.dataTransfer.getData("application/json")
+      );
+      // Don't drop onto itself or into its own subtree
+      if (
+        dragged.fullPath === item.fullPath ||
+        item.fullPath.startsWith(dragged.fullPath + "/")
+      )
+        return;
+      onMove(dragged, item.fullPath);
+    } catch (e) {
+      console.error("Drop parse error", e);
+    }
+  };
 
   if (item.type === "folder") {
     return (
-      <tr className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors group">
+      <tr
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`border-b border-gray-800 transition-colors group ${
+          isDragging
+            ? "opacity-40"
+            : isDragOver
+              ? "bg-blue-500/20 border-blue-500/50"
+              : "hover:bg-gray-800/50"
+        }`}
+      >
         <td className="py-2.5 px-4">
           <button
             onClick={() => onNavigate(item.fullPath)}
             className="flex items-center gap-2.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
           >
-            <span>📂</span>
+            <span>{isDragOver ? "📂" : "📂"}</span>
             <span className="font-medium">{item.name}</span>
           </button>
         </td>
@@ -108,7 +162,14 @@ export default function FileItem({ item, onNavigate, onDelete }: Props) {
   }
 
   return (
-    <tr className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors group">
+    <tr
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className={`border-b border-gray-800 hover:bg-gray-800/50 transition-colors group ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
       <td className="py-2.5 px-4">
         <div className="flex items-center gap-2.5">
           <span>{fileIcon(item.name)}</span>

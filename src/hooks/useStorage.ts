@@ -4,10 +4,33 @@ import {
   listAll,
   getDownloadURL,
   getMetadata,
+  getBlob,
+  uploadBytes,
   uploadBytesResumable,
   deleteObject,
 } from "firebase/storage";
 import { storage } from "../lib/firebase";
+
+async function moveFileInternal(sourcePath: string, destPath: string) {
+  const sourceRef = ref(storage, sourcePath);
+  const destRef = ref(storage, destPath);
+  const blob = await getBlob(sourceRef);
+  await uploadBytes(destRef, blob);
+  await deleteObject(sourceRef);
+}
+
+async function moveFolderRecursive(sourcePath: string, destPath: string) {
+  const sourceRef = ref(storage, sourcePath);
+  const result = await listAll(sourceRef);
+  await Promise.all([
+    ...result.prefixes.map((prefix) =>
+      moveFolderRecursive(prefix.fullPath, `${destPath}/${prefix.name}`)
+    ),
+    ...result.items.map((item) =>
+      moveFileInternal(item.fullPath, `${destPath}/${item.name}`)
+    ),
+  ]);
+}
 
 async function deleteFolderRecursive(folderPath: string) {
   const folderRef = ref(storage, folderPath);
@@ -160,6 +183,18 @@ export function useStorage() {
     await deleteFolderRecursive(fullPath);
   }, []);
 
+  const moveItem = useCallback(
+    async (item: StorageItem, targetFolderPath: string) => {
+      const destPath = `${targetFolderPath ? targetFolderPath + "/" : ""}${item.name}`;
+      if (item.type === "file") {
+        await moveFileInternal(item.fullPath, destPath);
+      } else {
+        await moveFolderRecursive(item.fullPath, destPath);
+      }
+    },
+    []
+  );
+
   const clearUploads = useCallback(() => setUploads([]), []);
 
   return {
@@ -171,6 +206,7 @@ export function useStorage() {
     createFolder,
     deleteItem,
     deleteFolder,
+    moveItem,
     clearUploads,
   };
 }

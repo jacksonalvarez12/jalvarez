@@ -6,6 +6,7 @@ interface Props {
   loading: boolean;
   onNavigate: (path: string) => void;
   onDelete: (fullPath: string) => void;
+  onMove: (item: StorageItem, targetFolderPath: string) => void;
 }
 
 export default function FileList({
@@ -13,6 +14,7 @@ export default function FileList({
   loading,
   onNavigate,
   onDelete,
+  onMove,
 }: Props) {
   if (loading) {
     return (
@@ -55,6 +57,7 @@ export default function FileList({
               item={item}
               onNavigate={onNavigate}
               onDelete={onDelete}
+              onMove={onMove}
             />
           ))}
         </tbody>

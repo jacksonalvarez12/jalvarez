@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { User } from "firebase/auth";
 import { useStorage } from "../hooks/useStorage";
+import type { StorageItem } from "../hooks/useStorage";
 import BreadcrumbNav from "./BreadcrumbNav";
 import FileList from "./FileList";
 import UploadZone from "./UploadZone";
@@ -23,6 +24,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
     createFolder,
     deleteItem,
     deleteFolder,
+    moveItem,
     clearUploads,
   } = useStorage();
 
@@ -36,6 +38,11 @@ export default function FileExplorer({ user, onSignOut }: Props) {
 
   const handleUpload = (files: File[]) => {
     uploadFiles(files, currentPath, refresh);
+  };
+
+  const handleMove = async (item: StorageItem, targetFolderPath: string) => {
+    await moveItem(item, targetFolderPath);
+    refresh();
   };
 
   const handleDelete = async (fullPath: string) => {
@@ -79,7 +86,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
       <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <BreadcrumbNav path={currentPath} onNavigate={setCurrentPath} />
+          <BreadcrumbNav path={currentPath} onNavigate={setCurrentPath} onMove={handleMove} />
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowNewFolder(!showNewFolder)}
@@ -147,6 +154,7 @@ export default function FileExplorer({ user, onSignOut }: Props) {
             loading={loading}
             onNavigate={setCurrentPath}
             onDelete={handleDelete}
+            onMove={handleMove}
           />
         </div>
       </div>
